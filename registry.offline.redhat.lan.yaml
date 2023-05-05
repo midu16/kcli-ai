@@ -1,0 +1,23 @@
+registry.offline.redhat.lan:
+ image: centos7
+ memory: 16000
+ numcpus: 8
+ disks: [100]
+ nets:
+ - name: default
+   ip: 192.168.122.101
+   netmask: 24
+   gateway: 192.168.122.1
+   ipv6: false
+ - name: isolatednetwrk6
+   ip: 2620:52:0:1305::101
+   netmask: 64
+   gateway: 2620:52:0:1305::1
+ files:
+ - path: /root/registry-install.sh
+   origin: registry-install.sh
+ - path: /etc/motd
+   content: Welcome to the registry.offline.redhat.lan
+ cmds:
+  - chmod a+x /root/registry-install.sh
+  - /root/registry-install.sh
