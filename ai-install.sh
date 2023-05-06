@@ -18,10 +18,54 @@ then
   exit 1
 fi
 
-# Install http-tools packet
-sudo yum -y install podman 
 # create the ai.offline.redhat.lan workingdirectory
 sudo mkdir -p /opt/ai/
+
+# Install http-tools packet
+if [ $(hostnamectl | grep "Operating System" | awk '{print $3 $5}') == "CentOS7" ]; then
+    sudo yum update -y 
+    wait
+    sudo yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    sudo yum -y install "@Development Tools"
+    wait
+    sudo yum install -y jq
+    wait
+    sudo yum install -y curl gcc make device-mapper-devel git btrfs-progs-devel conmon containernetworking-plugins containers-common glib2-devel glibc-devel glibc-static golang-github-cpuguy83-md2man gpgme-devel iptables libassuan-devel libgpg-error-devel libseccomp-devel libselinux-devel pkgconfig systemd-devel autoconf python3 python3-devel python3-pip yajl-devel libcap-devel
+    wait
+    sudo yum install -y wget
+    curl -L https://go.dev/dl/go1.20.4.linux-amd64.tar.gz --output /opt/ai/go1.20.4.linux-amd64.tar.gz
+    wait
+    tar xvf /opt/ai/go1.20.4.linux-amd64.tar.gz --directory /usr/local
+    export PATH=$PATH:/usr/local/go/bin
+    git clone https://github.com/containers/conmon /opt/ai/conmon
+    make -C /opt/ai/conmon
+    sudo make -C /opt/ai/conmon podman
+    git clone https://github.com/opencontainers/runc.git $GOPATH/src/github.com/opencontainers/runc
+    make -C $GOPATH/src/github.com/opencontainers/runc BUILDTAGS="selinux seccomp"
+    sudo cp $GOPATH/src/github.com/opencontainers/runc /usr/bin/runc
+    sudo mkdir -p /etc/containers
+    sudo curl -L -o /etc/containers/registries.conf https://src.fedoraproject.org/rpms/containers-common/raw/main/f/registries.conf
+    wait
+    sudo curl -L -o /etc/containers/policy.json https://src.fedoraproject.org/rpms/containers-common/raw/main/f/default-policy.json
+    wait
+    TAG=4.1.1
+    curl -sSfL https://github.com/containers/podman/archive/refs/tags/v${TAG}.tar.gz --output "/opt/ai/v${TAG}.tar.gz"
+    tar xvf /opt/ai/v${TAG}.tar.gz --directory /opt/ai/
+    sudo yum remove  gpgme-devel -y
+    sudo yum -y install https://cbs.centos.org/kojifiles/packages/gpgme/1.7.1/0.el7.centos.1/x86_64/gpgme-1.7.1-0.el7.centos.1.x86_64.rpm
+    sudo yum -y install https://cbs.centos.org/kojifiles/packages/gpgme/1.7.1/0.el7.centos.1/x86_64/gpgme-devel-1.7.1-0.el7.centos.1.x86_64.rpm
+    wait
+    make -C /opt/ai/podman-${TAG} BUILDTAGS="selinux seccomp"
+    wait
+    sudo make -C /opt/ai/podman-${TAG} install PREFIX=/usr
+    wait
+    sudo sed -ie 's/override_kernel_check/#override_kernel_check/g' /etc/containers/storage.conf
+else 
+    sudo yum -y install podman httpd-tools skopeo
+    wait
+fi
+
+
 
 # Adding the IPv6 /etc/hosts resolution 
 
@@ -30,19 +74,19 @@ echo "2620:52:0:1305::102 ${AI_HOSTNAME_FQDN}" >> /etc/hosts
 echo "2620:52:0:1305::253 api.someone-test.test412.com console-openshift-console.apps.someone-test.test412.com oauth-openshift.apps.someone-test.test412.com prometheus-k8s-openshift-monitoring.apps.someone-test.test412.com" >> /etc/hosts
 
 # Obtian the certificate from the repository
-echo -n | openssl s_client -connect ${OFFLINE_REG_HOSTNAME_FQDN}:5000 -servername ${OFFLINE_REG_HOSTNAME_FQDN} | openssl x509 > $(pwd)/file.crt
+echo -n | openssl s_client -connect ${OFFLINE_REG_HOSTNAME_FQDN}:5000 -servername ${OFFLINE_REG_HOSTNAME_FQDN} | openssl x509 > /opt/ai/file.crt
 
 # Copy certificate to the cert repository
-sudo cp $(pwd)/file.crt /etc/pki/ca-trust/source/anchors/
+sudo cp /opt/ai/file.crt /etc/pki/ca-trust/source/anchors/
 sudo update-ca-trust
 
 # validate that the certificate is accessible from the ai.offline.redhat.lan
-status_code=$(curl --write-out %{http_code} --silent -u admin:Sup3rR3gistry --output /dev/null https://${OFFLINE_REG_HOSTNAME_FQDN}:5000/v2/_catalog)
-if [[ "$status_code" -ne 200 ]] ; then
-        echo -e "\n Response Code changed to $status_code"
-        exit 1
-    else
-        echo -e "\n Response Code is $status_code. The Offline Registry its reachable"
+#status_code=$(curl --write-out %{http_code} --silent -u admin:Sup3rR3gistry --output /dev/null https://${OFFLINE_REG_HOSTNAME_FQDN}:5000/v2/_catalog)
+#if [[ "$status_code" -ne 200 ]] ; then
+#        echo -e "\n Response Code changed to $status_code"
+#        exit 1
+#    else
+#        echo -e "\n Response Code is $status_code. The Offline Registry its reachable"
 
 echo | openssl s_client -servername ${OFFLINE_REG_HOSTNAME_FQDN}:5000 -connect ${OFFLINE_REG_HOSTNAME_FQDN}:5000 2>/dev/null | openssl x509 > /opt/ai/tls-ca-bundle.pem
 export AI_PEM_CA=$(cat /opt/ai/tls-ca-bundle.pem)
@@ -171,3 +215,5 @@ spec:
             path: tls-ca-bundle.pem
 EOF
 
+
+podman play kube --configmap /opt/ai/configmap-disconnected.yml /opt/ai/pod-persistent-disconnected.yml
