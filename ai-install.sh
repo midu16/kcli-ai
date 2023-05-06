@@ -45,7 +45,7 @@ if [ $(hostnamectl | grep "Operating System" | awk '{print $3 $5}') == "CentOS7"
     git clone https://github.com/containers/conmon /opt/ai/conmon
     make -C /opt/ai/conmon
     sudo make -C /opt/ai/conmon podman
-    git clone https://github.com/midu16/kcli-ai.git /opt/ai/
+    git clone https://github.com/midu16/kcli-ai.git /opt/ai/kcli-ai
     wait
     sudo cp /opt/ai/kcli-ai/bin/runc /usr/bin/runc
     sudo chmod a+x /usr/bin/runc
