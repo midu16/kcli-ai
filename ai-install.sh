@@ -26,6 +26,7 @@ if [ $(hostnamectl | grep "Operating System" | awk '{print $3 $5}') == "CentOS7"
     sudo yum update -y 
     wait
     sudo yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    wait
     sudo yum -y install "@Development Tools"
     wait
     sudo yum install -y jq
@@ -33,22 +34,26 @@ if [ $(hostnamectl | grep "Operating System" | awk '{print $3 $5}') == "CentOS7"
     sudo yum install -y curl gcc make device-mapper-devel git btrfs-progs-devel conmon containernetworking-plugins containers-common glib2-devel glibc-devel glibc-static golang-github-cpuguy83-md2man gpgme-devel iptables libassuan-devel libgpg-error-devel libseccomp-devel libselinux-devel pkgconfig systemd-devel autoconf python3 python3-devel python3-pip yajl-devel libcap-devel
     wait
     sudo yum install -y wget
-    curl -L https://go.dev/dl/go1.20.4.linux-amd64.tar.gz --output /opt/ai/go1.20.4.linux-amd64.tar.gz
+    curl -L https://go.dev/dl/go1.18.9.linux-amd64.tar.gz --output /opt/ai/go1.18.9.linux-amd64.tar.gz
     wait
-    tar xvf /opt/ai/go1.20.4.linux-amd64.tar.gz --directory /usr/local
-    export PATH=$PATH:/usr/local/go/bin
+    tar xvf /opt/ai/go1.18.9.linux-amd64.tar.gz --directory /usr/local
+    echo "export PATH=$PATH:/usr/local/go/bin" >> /root/.bash_profile
+    source /root/.bash_profile
+    wait
+    sudo yum install -y golang
+    wait
     git clone https://github.com/containers/conmon /opt/ai/conmon
     make -C /opt/ai/conmon
     sudo make -C /opt/ai/conmon podman
-    git clone https://github.com/opencontainers/runc.git $GOPATH/src/github.com/opencontainers/runc
-    make -C $GOPATH/src/github.com/opencontainers/runc BUILDTAGS="selinux seccomp"
-    sudo cp $GOPATH/src/github.com/opencontainers/runc /usr/bin/runc
+    git clone https://github.com/opencontainers/runc.git /root/go/src/github.com/opencontainers/runc
+    make -C /root/go/src/github.com/opencontainers/runc BUILDTAGS="selinux seccomp"
+    sudo cp /root/go/src/github.com/opencontainers/runc /usr/bin/runc
     sudo mkdir -p /etc/containers
     sudo curl -L -o /etc/containers/registries.conf https://src.fedoraproject.org/rpms/containers-common/raw/main/f/registries.conf
     wait
     sudo curl -L -o /etc/containers/policy.json https://src.fedoraproject.org/rpms/containers-common/raw/main/f/default-policy.json
     wait
-    TAG=4.1.1
+    export TAG=4.1.1
     curl -sSfL https://github.com/containers/podman/archive/refs/tags/v${TAG}.tar.gz --output "/opt/ai/v${TAG}.tar.gz"
     tar xvf /opt/ai/v${TAG}.tar.gz --directory /opt/ai/
     sudo yum remove  gpgme-devel -y
@@ -89,7 +94,7 @@ sudo update-ca-trust
 #        echo -e "\n Response Code is $status_code. The Offline Registry its reachable"
 
 echo | openssl s_client -servername ${OFFLINE_REG_HOSTNAME_FQDN}:5000 -connect ${OFFLINE_REG_HOSTNAME_FQDN}:5000 2>/dev/null | openssl x509 > /opt/ai/tls-ca-bundle.pem
-export AI_PEM_CA=$(cat /opt/ai/tls-ca-bundle.pem)
+export AI_PEM_CA=$(cat /opt/ai/tls-ca-bundle.pem |tr -d '\n\t\r ')
 
 # Create configmap-disconnected.yml
 cat <<EOF | sudo tee /opt/ai/configmap-disconnected.yml
