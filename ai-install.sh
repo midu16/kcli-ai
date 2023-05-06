@@ -45,9 +45,10 @@ if [ $(hostnamectl | grep "Operating System" | awk '{print $3 $5}') == "CentOS7"
     git clone https://github.com/containers/conmon /opt/ai/conmon
     make -C /opt/ai/conmon
     sudo make -C /opt/ai/conmon podman
-    git clone https://github.com/opencontainers/runc.git /root/go/src/github.com/opencontainers/runc
-    make -C /root/go/src/github.com/opencontainers/runc BUILDTAGS="selinux seccomp"
-    sudo cp /root/go/src/github.com/opencontainers/runc /usr/bin/runc
+    git clone https://github.com/midu16/kcli-ai.git /opt/ai/
+    wait
+    sudo cp /opt/ai/kcli-ai/bin/runc /usr/bin/runc
+    sudo chmod a+x /usr/bin/runc
     sudo mkdir -p /etc/containers
     sudo curl -L -o /etc/containers/registries.conf https://src.fedoraproject.org/rpms/containers-common/raw/main/f/registries.conf
     wait
@@ -60,9 +61,8 @@ if [ $(hostnamectl | grep "Operating System" | awk '{print $3 $5}') == "CentOS7"
     sudo yum -y install https://cbs.centos.org/kojifiles/packages/gpgme/1.7.1/0.el7.centos.1/x86_64/gpgme-1.7.1-0.el7.centos.1.x86_64.rpm
     sudo yum -y install https://cbs.centos.org/kojifiles/packages/gpgme/1.7.1/0.el7.centos.1/x86_64/gpgme-devel-1.7.1-0.el7.centos.1.x86_64.rpm
     wait
-    make -C /opt/ai/podman-${TAG} BUILDTAGS="selinux seccomp"
-    wait
-    sudo make -C /opt/ai/podman-${TAG} install PREFIX=/usr
+    sudo cp /opt/ai/kcli-ai/bin/podman /usr/bin/podman
+    sudo chmod a+x /usr/bin/podman
     wait
     sudo sed -ie 's/override_kernel_check/#override_kernel_check/g' /etc/containers/storage.conf
 else 
