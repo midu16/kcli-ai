@@ -5,7 +5,7 @@ ai.offline.redhat.lan:
  disks: [100]
  nets:
  - name: default
-   ip: 192.168.122.101
+   ip: 192.168.122.102
    netmask: 24
    gateway: 192.168.122.1
    ipv6: false

@@ -13,7 +13,7 @@ $ kcli create network -c "2620:52:0:1305::0/64" --domain offline.redhat.lan -i i
 
 - Validating the subnet creation:
 ```bash
-kcli list network
+$ kcli list network
 Listing Networks...
 +-----------------+--------+---------------------+-------+---------------------------+----------+
 | Network         |  Type  |         Cidr        |  Dhcp |           Domain          |   Mode   |
