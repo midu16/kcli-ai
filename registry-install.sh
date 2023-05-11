@@ -24,7 +24,7 @@ if [ $(hostnamectl | grep "Operating System" | awk '{print $3 $5}') == "CentOS7"
     wait
     sudo yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
     wait
-    sudo yum install -y jq
+    sudo yum install -y jq httpd
     wait
 else 
     sudo yum -y install podman httpd-tools skopeo
@@ -41,14 +41,9 @@ sudo restorecon -Rv /opt/rhcos_image_cache/
 
 # Configure the rhcos_image_cache
 
-podman run -d --name rhcos_image_cache -v /opt/rhcos_image_cache:/var/www/html -p 3000:8080/tcp quay.io/centos7/httpd-24-centos7:latest
-wait
-podman generate systemd rhcos_image_cache > /etc/systemd/system/podman-rhcos_image_cache.service
-
 sudo systemctl daemon-reload
-sudo systemctl enable podman-rhcos_image_cache --now
+sudo systemctl enable httpd --now
 
-sleep 40
 # Configure CA certificate
 export HOSTNAME_FQDN=$(hostname --long)
 export CERT_C="AT"
@@ -164,13 +159,13 @@ done
 for index in "${args[@]}"
 do
     if [[ "$(echo "$index" | cut -d '_' -f 2)" == "64.qcow2.gz" ]]; then
-        curl -L ${QCOW2_RHCOS} --output "/opt/rhcos_image_cache/$index"
+        curl -L ${QCOW2_RHCOS} --output "/var/www/html/$index"
         wait
     elif [[ "$(echo "$index" | cut -d '_' -f 2)" == "64.iso" ]]; then
-        curl -L ${LIVE_RHCOS} --output "/opt/rhcos_image_cache/$index"
+        curl -L ${LIVE_RHCOS} --output "/var/www/html/$index"
         wait
     else
-        curl -L ${ROOTFS_RHCOS} --output "/opt/rhcos_image_cache/$index"
+        curl -L ${ROOTFS_RHCOS} --output "/var/www/html/$index"
         wait
     fi
 done
