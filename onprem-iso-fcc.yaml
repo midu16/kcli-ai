@@ -1,0 +1,249 @@
+variant: fcos
+version: 1.1.0
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys: ["replace-with-your-ssh-public-key"]
+      groups: [ sudo ]
+systemd:
+    units:
+        - name: assisted-service-env-prep.service
+          enabled: true
+          contents: |
+            [Unit]
+            After=network-online.target
+
+            [Service]
+            Type=oneshot
+            Restart=no
+            ExecStart=/bin/bash /etc/assisted-service/environment_prep.sh
+
+            [Install]
+            WantedBy=multi-user.target
+        - name: assisted-service-ip-configuration.service
+          enabled: true
+          contents: |
+            [Unit]
+            After=network-online.target
+
+            [Service]
+            Type=forking
+            Restart=no
+            ExecStart=/bin/bash /etc/assisted-service/startup_script.sh
+
+            [Install]
+            WantedBy=multi-user.target
+        - name: assisted-service.service
+          enabled: true
+          contents: |
+            [Unit]
+            After=assisted-service-pod.service
+            [Service]
+            Type=forking
+            Restart=no
+            ExecStart=podman play kube --network=podman1 --authfile=/etc/assisted-service/auth.json --configmap /etc/assisted-service/configmap-disconnected.yml /etc/assisted-service/pod-persistent-disconnected.yml
+            TimeoutStartSec=300
+
+            [Install]
+            WantedBy=multi-user.target
+storage:
+    files:
+        - path: /etc/assisted-service/file.crt
+          mode: 0644
+          contents:
+            inline: replace-with-your-offline-reg-cert
+        - path: /etc/assisted-service/environment_prep.sh
+          mode: 0755
+          contents:
+            inline: |
+              #!/bin/bash
+              echo "2620:52:0:1305::101 registry.offline.redhat.lan" >> /etc/hosts
+              mkdir -p /etc/assisted-service/
+              sudo cp /etc/assisted-service/file.crt /etc/pki/ca-trust/source/anchors/
+              wait
+              sudo update-ca-trust
+              podman login -uadmin -pSup3rR3gistry registry.offline.redhat.lan:5000
+              wait
+              podman network create --ipv6 --gateway fd00::1:8:1 --subnet fd00::1:8:0/112 --subnet 2620:52:0:1305::/64 podman1
+              wait
+              alias aicli='podman run --authfile=/etc/assisted-service/auth.json --security-opt label=disable --net host -it --rm -e AI_URL=ai.offline.redhat.lan:8080 -v /etc/assisted-service:/workdir registry.offline.redhat.lan:5000/karmab/aicli:latest'
+              wait
+              echo "alias aicli='podman run --authfile=/etc/assisted-service/auth.json --security-opt label=disable --net host -it --rm -e AI_URL=ai.offline.redhat.lan:8080 -v /etc/assisted-service:/workdir registry.offline.redhat.lan:5000/karmab/aicli:latest'" >> .bashrc
+              wait
+              echo "alias aicli='podman run --authfile=/etc/assisted-service/auth.json --security-opt label=disable --net host -it --rm -e AI_URL=ai.offline.redhat.lan:8080 -v /etc/assisted-service:/workdir registry.offline.redhat.lan:5000/karmab/aicli:latest'" >> /var/home/core/.bashrc
+              wait
+        - path: /etc/assisted-service/configmap-disconnected.yml
+          mode: 0644
+          contents:
+            inline: |
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: config
+                data:
+                  ASSISTED_SERVICE_HOST: ai.offline.redhat.lan:8090
+                  ASSISTED_SERVICE_SCHEME: http
+                  AUTH_TYPE: none
+                  DB_HOST: ::1
+                  DB_NAME: installer
+                  DB_PASS: admin
+                  DB_PORT: "5432"
+                  DB_USER: admin
+                  DEPLOY_TARGET: onprem
+                  DISK_ENCRYPTION_SUPPORT: "true"
+                  DUMMY_IGNITION: "false"
+                  ENABLE_SINGLE_NODE_DNSMASQ: "true"
+                  HW_VALIDATOR_REQUIREMENTS: '[{"version":"default","master":{"cpu_cores":4,"ram_mib":16384,"disk_size_gb":100,"installation_disk_speed_threshold_ms":10,"network_latency_threshold_ms":100,"packet_loss_percentage":0},"worker":{"cpu_cores":2,"ram_mib":8192,"disk_size_gb":100,"installation_disk_speed_threshold_ms":10,"network_latency_threshold_ms":1000,"packet_loss_percentage":10},"sno":{"cpu_cores":8,"ram_mib":16384,"disk_size_gb":100,"installation_disk_speed_threshold_ms":10}}]'
+                  IMAGE_SERVICE_BASE_URL: http://ai.offline.redhat.lan:8888
+                  IPV6_SUPPORT: "true"
+                  ISO_IMAGE_TYPE: "full-iso"
+                  LISTEN_PORT: "8888"
+                  NTP_DEFAULT_SERVER: ""
+                  OS_IMAGES: '[{"openshift_version":"4.12","cpu_architecture":"x86_64","url":"http://[2620:52:0:1305::101]:80/rhcos-4.12.2-live.x86_64.iso","version":"412.86.202301311551-0"}]'
+                  POSTGRESQL_DATABASE: installer
+                  POSTGRESQL_PASSWORD: admin
+                  POSTGRESQL_USER: admin
+                  PUBLIC_CONTAINER_REGISTRIES: 'quay.io'
+                  RELEASE_IMAGES: '[{"openshift_version":"4.12","cpu_architecture":"x86_64","cpu_architectures":["x86_64"],"url":"registry.offline.redhat.lan:5000/ocp-release:4.12.2-x86_64","version":"4.12.2","default":true}]'
+                  SERVICE_BASE_URL: http://ai.offline.redhat.lan:8090
+                  STORAGE: filesystem
+                  ENABLE_UPGRADE_AGENT: "false"
+                  AGENT_DOCKER_IMAGE: "registry.offline.redhat.lan:5000/edge-infrastructure/assisted-installer-agent:latest"
+                  CONTROLLER_IMAGE: "registry.offline.redhat.lan:5000/edge-infrastructure/assisted-installer-controller:latest"
+                  INSTALLER_IMAGE: "registry.offline.redhat.lan:5000/edge-infrastructure/assisted-installer:latest"
+
+                  registries.conf: |
+                    unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
+                    [[registry]]
+                        prefix = ""
+                        location = "quay.io/openshift-release-dev/ocp-release"
+                        mirror-by-digest-only = true
+                        [[registry.mirror]]
+                        location = "registry.offline.redhat.lan:5000/ocp-release"
+                    [[registry]]
+                        prefix = ""
+                        location = "quay.io/openshift-release-dev/ocp-v4.0-art-dev"
+                        mirror-by-digest-only = true
+                        [[registry.mirror]]
+                        location = "registry.offline.redhat.lan:5000/ocp-release"
+                  tls-ca-bundle.pem: |
+                    -----BEGIN CERTIFICATE-----
+                    MIIF6TCCA9GgAwIBAgIUUjmnkv8UdECYTpvmfijLUIL1GVMwDQYJKoZIhvcNAQEL
+                    BQAwcDELMAkGA1UEBhMCQVQxDTALBgNVBAgMBFdpZW4xDTALBgNVBAcMBFdpZW4x
+                    DzANBgNVBAoMBlJlZEhhdDEMMAoGA1UECwwDUiZEMSQwIgYDVQQDDBtyZWdpc3Ry
+                    eS5vZmZsaW5lLnJlZGhhdC5sYW4wHhcNMjMwNTA1MjA0OTAwWhcNMzMwNTAyMjA0
+                    OTAwWjBwMQswCQYDVQQGEwJBVDENMAsGA1UECAwEV2llbjENMAsGA1UEBwwEV2ll
+                    bjEPMA0GA1UECgwGUmVkSGF0MQwwCgYDVQQLDANSJkQxJDAiBgNVBAMMG3JlZ2lz
+                    dHJ5Lm9mZmxpbmUucmVkaGF0LmxhbjCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCC
+                    AgoCggIBANcHlw1lQOkioBN6qQDWBcbTg8rHsNxnH1IQWFVCxspcAE1MH9gQq86L
+                    JcrrCANUDxvLhj7uT7YSJmsgpuEgQ8si2b4f52OK0FKg1CPgEs8OoSzZzWJcJVtB
+                    0MQ+MDCEVzC8CYGwP03r91SBpaYiDxeyeFbWHL5SUSi4SsLtIbQPHImrC6hDpzvc
+                    xfwriE49uw3RYmM9xL3ZHB8DRhnVBuBJ8MwTQDHaxzkGJ0a3KSaydaX90PPUDtFq
+                    Avyyw6o8QR1zLlcXsvhQYK1pPz/Qf2DJ/2gzNugM9sDKPr+A6X9q602yYe7hStVl
+                    WebKw9kOWtX8U4TJmkou3fZZPLi1BgXzUOzs09zrkNVsSav8JNfk7DEcWMByZ+4n
+                    aG/9lF2gXss/a+zYe+uWP88f8Q/EVrh3RxAOxkoYyhXlwZKmrBNKLO/HEAEfUaj9
+                    U2P0TENpVDCj3BcJF3WKzuWvQWgvRFyKiSwmtiPwOob5SmGDNzoHEeMfqBN+Q55h
+                    gp/EY6smTNqXfUAVfyBGWnwxdvg7vIct3MGOzNZyFkgbwE5DB/c+7cAmV8cTwOKH
+                    glFsFLfSZ8HN02npZC2AHGS5sbPheZHcAwK6lg8CEXn2oYgltlW0rJBq7ciE8PO0
+                    uFuOoRSjUO+LwEFHMWhCsS8vigEz/8eWuidAQnTIpD8f2qwOUwO5AgMBAAGjezB5
+                    MB0GA1UdDgQWBBQ7eaxHO3CVtb/DpUr6WJztmC7k+TAfBgNVHSMEGDAWgBQ7eaxH
+                    O3CVtb/DpUr6WJztmC7k+TAPBgNVHRMBAf8EBTADAQH/MCYGA1UdEQQfMB2CG3Jl
+                    Z2lzdHJ5Lm9mZmxpbmUucmVkaGF0LmxhbjANBgkqhkiG9w0BAQsFAAOCAgEAmtvn
+                    9/jz9uhXgCq4/hwghWlk7lt0WRqbfQVe/WucfVpsNtr06V9zJ0RDFnTfAjgcouYr
+                    ou6Th5ek6dkc5pJaiFwemXzmbPi5w2Z3aw+CluMLEFRgqh9WX25CNrB7Vs0Clj26
+                    Y/Z65VOn+Kwh4y0t/EGXQSZ6Wy+AuIEDu6PaxXbs7cEWEeW/vIjKhlUisRrleoeq
+                    gcBdNMaqh8h9bzCCnCVpwOS9bW9HRjqG0J1tYy04EXnUzHOQfXrMEGzBxEzUQBCt
+                    S0cEI61QjR1V3MSe0JNPG7vy+YepKlekYgjDB0aQMEi9HfAY3o6LSfDLTU8R0+LA
+                    awGRXKP56I1teKE0G/djFTG/3ynqsJFqPzT9fu5UxZ7YHR8XcdUTQSwTxqoAfIUa
+                    DHWU3ccJeNWIFm1FEypJSjtCIB0674MvoA20/aSHqqDqUz/K+FpBCvWuAm/wHmAs
+                    50SD4FDmbLYD7TrmCEbZ/WSV1rwkuefezBWnZ23tz4hkhuAiJ0WTj3V/OcF1q6iz
+                    D1+TO3QVD1AaTyV1J596Pov9yEx6+ZmlGx35XvPAd3AMpt3TKKUUGfgBIIBXAXoX
+                    tMfH87z77R9vRvHZ1bjVjYMCOq0zj1o5ubvKuCVHSe4K4M5/s/VyA+FdK+N8wLAd
+                    1N2+1FMu7Us578JzVNCg/C+ZzQ4cjXrfbd63uXM=
+                    -----END CERTIFICATE-----
+        - path: /etc/assisted-service/pod-persistent-disconnected.yml
+          mode: 0644
+          contents:
+            inline: |
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  labels:
+                    app: assisted-installer
+                  name: assisted-installer
+                spec:
+                  containers:
+                  - args:
+                    - run-postgresql
+                    image: registry.offline.redhat.lan:5000/centos7/postgresql-12-centos7:latest
+                    name: db
+                    envFrom:
+                    - configMapRef:
+                        name: config
+                    volumeMounts:
+                      - mountPath: /var/lib/pgsql
+                        name: pg-data
+                  - image: registry.offline.redhat.lan:5000/edge-infrastructure/assisted-installer-ui:latest
+                    name: ui
+                    ports:
+                    - hostPort: 8080
+                    envFrom:
+                    - configMapRef:
+                        name: config
+                  - image: registry.offline.redhat.lan:5000/edge-infrastructure/assisted-image-service:latest
+                    name: image-service
+                    ports:
+                    - hostPort: 8888
+                    envFrom:
+                    - configMapRef:
+                        name: config
+                  - image: registry.offline.redhat.lan:5000/edge-infrastructure/assisted-service:latest
+                    name: service
+                    ports:
+                    - hostPort: 8090
+                    envFrom:
+                    - configMapRef:
+                        name: config
+                    volumeMounts:
+                      - mountPath: /data
+                        name: ai-data
+                      - mountPath: /etc/containers
+                        name: mirror-registry-config
+                      - mountPath: /etc/pki/ca-trust/extracted/pem
+                        subPath: tls-ca-bundle.pem
+                        name: mirror-registry-config
+                  restartPolicy: Never
+                  volumes:
+                    - name: ai-data
+                      persistentVolumeClaim:
+                        path: /opt/ai/ai-service-data
+                        type: Directory  
+                    - name: pg-data
+                      persistentVolumeClaim:
+                        path: /opt/ai/ai-db-data
+                        type: Directory  
+                    - name: mirror-registry-config
+                      configMap:
+                        name: config
+                        deafultMode: 420
+                        items:
+                          - key: registries.conf
+                            path: registries.conf
+                          - key: tls-ca-bundle.pem
+                            path: tls-ca-bundle.pem
+        - path: /etc/assisted-service/auth.json
+          mode: 0644
+          contents:
+            inline: replace-with-your-urlencoded-pull-secret
+        - path: /etc/assisted-service/startup_script.sh
+          mode: 0755
+          contents:
+            inline: |
+              #!/bin/bash
+              ips=$(hostname -I)
+              read -r -a ipArr <<< "$ips"
+              for ip in "${ipArr[@]}"
+                  do
+                      printf "\n%s ai.offline.redhat.lan\n" "$ip" >> /etc/hosts
+                  done
+              ips_cs=`echo $ips | xargs | sed -e 's/ /,/g'`
