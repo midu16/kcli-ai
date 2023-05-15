@@ -37,7 +37,7 @@ systemd:
           enabled: true
           contents: |
             [Unit]
-            After=assisted-service-pod.service
+            After=assisted-service-env-prep.service
             [Service]
             Type=forking
             Restart=no
