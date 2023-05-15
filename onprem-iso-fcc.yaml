@@ -64,7 +64,7 @@ storage:
               sudo update-ca-trust
               podman login -uadmin -pSup3rR3gistry registry.offline.redhat.lan:5000
               wait
-              podman network create --ipv6 --gateway fd00::1:8:1 --subnet fd00::1:8:0/112 --subnet 2620:52:0:1305::/64 podman1
+              podman network create --ipv6 --gateway fd00::1:8:1 --subnet fd00::1:8:0/112 podman1
               wait
               echo "alias aicli='podman run --authfile=/etc/assisted-service/auth.json --security-opt label=disable --net host -it --rm -e AI_URL=ai.offline.redhat.lan:8080 -v /etc/assisted-service:/workdir registry.offline.redhat.lan:5000/karmab/aicli:latest'" >> /root/.bashrc
               wait
