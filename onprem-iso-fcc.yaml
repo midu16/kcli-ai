@@ -57,7 +57,7 @@ storage:
           contents:
             inline: |
               #!/bin/bash
-              echo "2620:52:0:1305::101 registry.offline.redhat.lan" >> /etc/hosts
+              printf "\n%s registry.offline.redhat.lan\n" "2620:52:0:1305::101" >> /etc/hosts
               mkdir -p /etc/assisted-service/
               sudo cp /etc/assisted-service/file.crt /etc/pki/ca-trust/source/anchors/
               wait
