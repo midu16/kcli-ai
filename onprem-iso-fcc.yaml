@@ -60,6 +60,7 @@ storage:
               printf "\n%s registry.offline.redhat.lan\n" "2620:52:0:1305::101" >> /etc/hosts
               hostnamectl set-hostname ai.offline.redhat.lan
               printf "Welcome to the ai.offline.redhat.lan\n " > /etc/motd
+              echo "y\n" | HOSTNAME=`hostname` ssh-keygen -t rsa -C "$HOSTNAME" -f "$HOME/.ssh/id_rsa" -P ""
               mkdir -p /etc/assisted-service/
               sudo cp /etc/assisted-service/file.crt /etc/pki/ca-trust/source/anchors/
               wait
