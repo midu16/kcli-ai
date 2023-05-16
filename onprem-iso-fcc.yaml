@@ -58,6 +58,8 @@ storage:
             inline: |
               #!/bin/bash
               printf "\n%s registry.offline.redhat.lan\n" "2620:52:0:1305::101" >> /etc/hosts
+              hostnamectl set-hostname ai.offline.redhat.lan
+              printf "Welcome to the ai.offline.redhat.lan\n " > /etc/motd
               mkdir -p /etc/assisted-service/
               sudo cp /etc/assisted-service/file.crt /etc/pki/ca-trust/source/anchors/
               wait
@@ -66,9 +68,9 @@ storage:
               wait
               podman network create --ipv6 --gateway fd00::1:8:1 --subnet fd00::1:8:0/112 podman1
               wait
-              echo "alias aicli='podman run --authfile=/etc/assisted-service/auth.json --security-opt label=disable --net host -it --rm -e AI_URL=ai.offline.redhat.lan:8080 -v /etc/assisted-service:/workdir registry.offline.redhat.lan:5000/karmab/aicli:latest'" >> /root/.bashrc
+              echo "alias aicli='podman run --authfile=/etc/assisted-service/auth.json --security-opt label=disable --net host -it --rm -e AI_URL=ai.offline.redhat.lan:8080 -v $HOME/.ssh:/root/.ssh -v /etc/assisted-service:/workdir registry.offline.redhat.lan:5000/karmab/aicli:latest'" >> /root/.bashrc
               wait
-              echo "alias aicli='podman run --authfile=/etc/assisted-service/auth.json --security-opt label=disable --net host -it --rm -e AI_URL=ai.offline.redhat.lan:8080 -v /etc/assisted-service:/workdir registry.offline.redhat.lan:5000/karmab/aicli:latest'" >> /var/home/core/.bashrc
+              echo "alias aicli='podman run --authfile=/etc/assisted-service/auth.json --security-opt label=disable --net host -it --rm -e AI_URL=ai.offline.redhat.lan:8080 -v $HOME/.ssh:/root/.ssh -v /etc/assisted-service:/workdir registry.offline.redhat.lan:5000/karmab/aicli:latest'" >> /var/home/core/.bashrc
               wait
         - path: /etc/assisted-service/configmap-disconnected.yml
           mode: 0644
@@ -117,13 +119,13 @@ storage:
                         location = "quay.io/openshift-release-dev/ocp-release"
                         mirror-by-digest-only = true
                         [[registry.mirror]]
-                        location = "registry.offline.redhat.lan:5000/ocp-release"
+                        location = "registry.offline.redhat.lan:5000/ocp4"
                     [[registry]]
                         prefix = ""
                         location = "quay.io/openshift-release-dev/ocp-v4.0-art-dev"
                         mirror-by-digest-only = true
                         [[registry.mirror]]
-                        location = "registry.offline.redhat.lan:5000/ocp-release"
+                        location = "registry.offline.redhat.lan:5000/ocp4"
                   tls-ca-bundle.pem: |
                     -----BEGIN CERTIFICATE-----
                     <certificate_content>
