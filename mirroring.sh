@@ -11,6 +11,7 @@ read -p "Enter the path to your pull-secret.json : " n1
 read -p "Enter the OCP version you want to mirror : " n2
 
 # Preparing the global variables for this section
+export HOSTNAME_FQDN=$(hostname -f)
 export REGISTRY_NAME=${HOSTNAME_FQDN}
 export REGISTRY_NAMESPACE=olm-mirror
 export LOCAL_REG="${REGISTRY_NAME}:5000"
